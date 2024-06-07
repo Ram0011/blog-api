@@ -10,11 +10,18 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
 const fs = require("fs");
+const path = require("path");
 
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.SECRET;
 
-//middlewares
+// Ensure the '/tmp/uploads' directory exists
+const uploadDir = "/tmp/uploads";
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Middlewares
 app.use(
     cors({
         credentials: true,
@@ -24,14 +31,14 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
-const uploadMiddleware = multer({ dest: "./uploads" });
-app.use("/uploads", express.static(__dirname + "/uploads"));
+const uploadMiddleware = multer({ dest: uploadDir });
+app.use("/uploads", express.static(uploadDir));
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ error: "Internal Server Error" });
 });
 
-//connect to database
+// Connect to database
 mongoose
     .connect(process.env.CONNECT)
     .then(() => {
@@ -41,7 +48,7 @@ mongoose
         console.error("Error connecting to the database:", error);
     });
 
-//requests
+// Requests
 app.get("/test", (req, res) => {
     res.json("test Ok");
 });
@@ -50,14 +57,12 @@ app.post("/register", async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // check if username is already taken
         const user = await User.findOne({ username });
         if (user) {
             return res
                 .status(409)
                 .json({ error: "Username is already taken." });
         } else {
-            // create new user
             const userDoc = await User.create({
                 username,
                 password: bcrypt.hashSync(password, salt),
@@ -136,11 +141,11 @@ app.post("/logout", (req, res) => {
 });
 
 app.post("/post", uploadMiddleware.single("file"), async (req, res) => {
-    const { originalname, path } = req.file;
+    const { originalname, path: filePath } = req.file;
     const parts = originalname.split(".");
     const ext = parts[parts.length - 1];
-    const newPath = path + "." + ext;
-    fs.renameSync(path, newPath);
+    const newPath = filePath + "." + ext;
+    fs.renameSync(filePath, newPath);
 
     const { token } = req.cookies;
     jwt.verify(token, secret, async (err, info) => {
@@ -163,11 +168,11 @@ app.post("/post", uploadMiddleware.single("file"), async (req, res) => {
 app.put("/post", uploadMiddleware.single("file"), (req, res) => {
     let newPath = null;
     if (req.file) {
-        const { originalname, path } = req.file;
+        const { originalname, path: filePath } = req.file;
         const parts = originalname.split(".");
         const ext = parts[parts.length - 1];
-        newPath = path + "." + ext;
-        fs.renameSync(path, newPath);
+        newPath = filePath + "." + ext;
+        fs.renameSync(filePath, newPath);
     }
 
     const { token } = req.cookies;
@@ -206,7 +211,7 @@ app.get("/post/:id", async (req, res) => {
     res.json(postDoc);
 });
 
-//server running
+// Server running
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server running on port: ${port}`);
