@@ -42,6 +42,10 @@ mongoose
     });
 
 //requests
+app.get("/test", (req, res) => {
+    res.json("test Ok");
+});
+
 app.post("/register", async (req, res) => {
     const { username, password } = req.body;
 
@@ -200,11 +204,6 @@ app.get("/post/:id", async (req, res) => {
     const { id } = req.params;
     const postDoc = await Post.findById(id).populate("author", ["username"]);
     res.json(postDoc);
-});
-
-app.get("/test", (req, res) => {
-    const test = "test";
-    res.json({ test });
 });
 
 //server running
